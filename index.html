@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cat Finance">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{
   --bg:#0B0B0B;--surface:#141414;--card:#1C1C1C;--border:#2A2A2A;
@@ -640,6 +641,7 @@ function openAddSheet(){
     + '<button class="btn-save" style="background:var(--success);box-shadow:none" onclick="openModal(\'receita\')">💰  Receita / Entrada</button>'
     + '<button class="btn-save" style="background:var(--card);color:var(--white);border:1.5px solid var(--border);box-shadow:none" onclick="openModal(\'meta\')">🎯  Nova Meta</button>'
     + '<button class="btn-save" style="background:var(--card);color:var(--white);border:1.5px solid var(--border);box-shadow:none" onclick="openModal(\'predictor\')">🔮  Item Predictor</button>'
+    + '<button class="btn-save" style="background:rgba(255,200,0,.15);color:var(--yellow);border:1.5px solid var(--yellow);box-shadow:none;margin-top:4px" onclick="openModal(\'scan\')">📷  Escanear Nota Fiscal</button>'
     + '</div>';
   document.getElementById('modal').classList.add('open');
 }
@@ -730,6 +732,41 @@ function getForm(type){
     + '<div class="form-group"><label class="form-label">Data da última compra</label>'
     + '<input class="form-input" id="f-data" type="date" value="'+today+'"></div>'
     + '<button class="btn-save" onclick="savePredictor()">Salvar</button>';
+
+  if(type==='scan') return ''
+    + '<div style="text-align:center;padding:8px 0 20px">'
+    + '<div style="font-size:48px;margin-bottom:10px">📷</div>'
+    + '<p style="font-size:14px;color:var(--gray);margin-bottom:20px">Fotografe a nota fiscal ou cupom fiscal. O app tentará extrair o valor, data e estabelecimento automaticamente.</p>'
+    + '<label style="display:block;width:100%;padding:16px;border-radius:14px;border:2px dashed var(--yellow);color:var(--yellow);font-size:15px;font-weight:700;cursor:pointer;background:var(--ydim)">'
+    + '📁 Escolher / Tirar foto'
+    + '<input type="file" accept="image/*" capture="environment" style="display:none" onchange="processReceiptImage(this)">'
+    + '</label>'
+    + '<div id="ocr-progress" style="display:none;margin-top:20px">'
+    + '<div style="font-size:13px;color:var(--gray);margin-bottom:8px" id="ocr-status">Lendo a nota...</div>'
+    + '<div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">'
+    + '<div id="ocr-bar" style="height:100%;background:var(--yellow);width:0%;transition:width .3s;border-radius:3px"></div>'
+    + '</div></div>'
+    + '<img id="ocr-preview" style="display:none;width:100%;border-radius:10px;margin-top:16px;max-height:220px;object-fit:cover">'
+    + '</div>'
+    + '<div id="ocr-result" style="display:none">'
+    + '<div class="sep-title" style="margin-bottom:12px">Dados extraídos — confirme antes de salvar</div>'
+    + '<div class="form-group"><label class="form-label">Estabelecimento / Descrição</label>'
+    + '<input class="form-input" id="ocr-desc" placeholder="Nome do estabelecimento"></div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label class="form-label">Valor Total</label>'
+    + '<input class="form-input" id="ocr-valor" type="number" step="0.01" placeholder="0,00"></div>'
+    + '<div class="form-group"><label class="form-label">Data</label>'
+    + '<input class="form-input" id="ocr-data" type="date"></div>'
+    + '</div>'
+    + '<div class="form-group"><label class="form-label">Categoria</label>'
+    + '<div style="display:flex;gap:8px">'
+    + '<input class="form-input" id="ocr-cat" placeholder="Alimentação..." list="cat-list" style="flex:1">'
+    + '<button onclick="addCategoria()" style="padding:0 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);color:var(--yellow);font-size:20px;cursor:pointer;flex-shrink:0">+</button>'
+    + '</div>' + catDatalist() + '</div>'
+    + '<div id="ocr-raw-toggle" style="font-size:12px;color:var(--gray);text-align:center;cursor:pointer;margin-top:4px" onclick="document.getElementById(\'ocr-raw\').style.display=document.getElementById(\'ocr-raw\').style.display===\'none\'?\'block\':\'none\'">Ver texto bruto extraído ▾</div>'
+    + '<pre id="ocr-raw" style="display:none;font-size:10px;color:var(--gray);background:var(--card);padding:10px;border-radius:8px;overflow:auto;max-height:120px;white-space:pre-wrap;margin-top:6px"></pre>'
+    + '<button class="btn-save" onclick="saveOcrBill()">💾 Lançar despesa</button>'
+    + '</div>';
 
   if(type==='edit-perfil') return ''
     + '<div class="form-group"><label class="form-label">Nome</label>'
@@ -861,6 +898,128 @@ function showToast(msg){
   document.body.appendChild(t);
   setTimeout(function(){ t.style.opacity='1'; },10);
   setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); },300); },2200);
+}
+
+/* ═══════════════════════════════════
+   OCR — NOTA FISCAL
+═══════════════════════════════════ */
+function processReceiptImage(input){
+  var file = input.files[0];
+  if(!file) return;
+
+  // preview
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = document.getElementById('ocr-preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+
+  // show progress
+  document.getElementById('ocr-progress').style.display = 'block';
+  document.getElementById('ocr-result').style.display = 'none';
+
+  Tesseract.recognize(file, 'por', {
+    logger: function(m){
+      if(m.status === 'recognizing text'){
+        var pct = Math.round(m.progress * 100);
+        document.getElementById('ocr-bar').style.width = pct + '%';
+        document.getElementById('ocr-status').textContent = 'Lendo a nota... ' + pct + '%';
+      }
+    }
+  }).then(function(result){
+    document.getElementById('ocr-progress').style.display = 'none';
+    var text = result.data.text;
+    document.getElementById('ocr-raw').textContent = text;
+    parseReceiptText(text);
+    document.getElementById('ocr-result').style.display = 'block';
+  }).catch(function(err){
+    document.getElementById('ocr-progress').style.display = 'none';
+    document.getElementById('ocr-status').textContent = 'Erro ao ler a nota.';
+    showToast('Erro no OCR. Tente uma foto mais nítida.');
+    console.error(err);
+  });
+}
+
+function parseReceiptText(text){
+  var lines = text.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 1; });
+
+  // 1. VALOR — busca padrões "TOTAL" ou o maior valor R$ no texto
+  var valor = 0;
+  var totalPatterns = [
+    /(?:VALOR\s*TOTAL|TOTAL\s*GERAL|TOTAL\s*A\s*PAGAR|TOTAL\s*CUPOM|TOTAL)[^\d]*(\d+[.,]\d{2})/i,
+    /R\$\s*(\d+[.,]\d{2})/ig
+  ];
+
+  // tenta achar linha com TOTAL
+  var matchTotal = text.match(totalPatterns[0]);
+  if(matchTotal){
+    valor = parseFloat(matchTotal[1].replace(',','.'));
+  } else {
+    // pega o maior valor R$ encontrado (provavelmente o total)
+    var allVals = [];
+    var re = /R\$\s*(\d+[.,]\d{2})/ig;
+    var m;
+    while((m = re.exec(text)) !== null){
+      allVals.push(parseFloat(m[1].replace(',','.')));
+    }
+    // também busca valores sem R$
+    var re2 = /(\d{1,4}[.,]\d{2})/g;
+    while((m = re2.exec(text)) !== null){
+      var v = parseFloat(m[1].replace(',','.'));
+      if(v > 0.5 && v < 99999) allVals.push(v);
+    }
+    if(allVals.length) valor = Math.max.apply(null, allVals);
+  }
+
+  // 2. DATA — DD/MM/YYYY ou DD/MM/YY
+  var dataMatch = text.match(/(\d{2})\/(\d{2})\/(\d{2,4})/);
+  var dataISO = new Date().toISOString().split('T')[0];
+  if(dataMatch){
+    var d = dataMatch[1], mo = dataMatch[2], yr = dataMatch[3];
+    if(yr.length === 2) yr = '20' + yr;
+    dataISO = yr + '-' + mo + '-' + d;
+  }
+
+  // 3. ESTABELECIMENTO — primeiras linhas não-numéricas geralmente têm o nome
+  var nome = '';
+  for(var i=0; i<Math.min(6,lines.length); i++){
+    var l = lines[i];
+    // ignora linhas só de números, CPF, CNPJ, datas
+    if(/^\d/.test(l)) continue;
+    if(l.length < 3) continue;
+    if(/cnpj|cpf|inscri|nfce|nfc-e|sat|cfe|cupom/i.test(l)) continue;
+    nome = l;
+    break;
+  }
+
+  // preenche os campos
+  document.getElementById('ocr-desc').value  = nome;
+  document.getElementById('ocr-valor').value = valor > 0 ? valor.toFixed(2) : '';
+  document.getElementById('ocr-data').value  = dataISO;
+
+  // categoria padrão se tiver palavras-chave
+  var cat = '';
+  if(/mercado|supermercado|hortifruti|padaria|acougue|mercearia|minimercado/i.test(text)) cat = 'Alimentação';
+  else if(/combustiv|gasolina|etanol|diesel|posto|shell|ipiranga|br\s*dist/i.test(text)) cat = 'Combustível';
+  else if(/farmac|drogaria|drogar|medic/i.test(text)) cat = 'Saúde';
+  else if(/restaurante|lanchonete|pizzaria|hamburger|sushi|cafe|bar /i.test(text)) cat = 'Alimentação';
+  if(cat) document.getElementById('ocr-cat').value = cat;
+
+  showToast(valor > 0 ? 'Nota lida! Confira os dados 👆' : 'Nota lida — valor não encontrado, preencha manualmente');
+}
+
+function saveOcrBill(){
+  var desc  = (document.getElementById('ocr-desc').value||'').trim() || 'Nota Fiscal';
+  var valor = parseFloat(document.getElementById('ocr-valor').value||0);
+  var data  = document.getElementById('ocr-data').value || new Date().toISOString().split('T')[0];
+  var cat   = (document.getElementById('ocr-cat').value||'').trim() || 'Despesa';
+  if(!valor){ showToast('Preencha o valor'); return; }
+  S.bills.push({id:uid(),desc:desc,valor:valor,vencimento:data,categoria:cat,tipo:'despesa',
+    pago:false,dataPagamento:null,recorrente:false,parcelado:false});
+  save(); closeModal(); renderHome(); renderContas();
+  showToast('Lançamento salvo! 🧾');
 }
 
 /* ═══════════════════════════════════
