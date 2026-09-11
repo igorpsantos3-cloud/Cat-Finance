@@ -1,8 +1,7 @@
 /* ══════════════════════════════════════════════════
-   Cat Finance — Persistência v3 (corrigido)
+   Cat Finance — Persistência v4 (definitivo)
 ════════════════════════════════════════════════════ */
 
-/* ── DADOS ── */
 let transactions = [];
 let metas        = [];
 let gatoTx       = [];
@@ -14,70 +13,84 @@ const FMT = v => 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigi
 /* ── LOCALSTORAGE ── */
 function saveData() {
   try {
-    localStorage.setItem('cf_tx',      JSON.stringify(transactions));
-    localStorage.setItem('cf_metas',   JSON.stringify(metas));
-    localStorage.setItem('cf_gato_tx', JSON.stringify(gatoTx));
-    localStorage.setItem('cf_perfil',  JSON.stringify(perfil));
+    localStorage.setItem('cf_tx',        JSON.stringify(transactions));
+    localStorage.setItem('cf_metas',     JSON.stringify(metas));
+    localStorage.setItem('cf_gato_tx',   JSON.stringify(gatoTx));
+    localStorage.setItem('cf_perfil',    JSON.stringify(perfil));
     const preds = (window.predictorItems||[]).map(i=>({...i,
       lastDate: i.lastDate instanceof Date ? i.lastDate.toISOString() : i.lastDate,
       nextDate: i.nextDate instanceof Date ? i.nextDate.toISOString() : i.nextDate
     }));
     localStorage.setItem('cf_predictor', JSON.stringify(preds));
-  } catch(e){}
+  } catch(e){ console.warn('save error',e); }
 }
 
 function loadData() {
   try {
-    transactions = JSON.parse(localStorage.getItem('cf_tx')       || '[]');
-    metas        = JSON.parse(localStorage.getItem('cf_metas')    || '[]');
-    gatoTx       = JSON.parse(localStorage.getItem('cf_gato_tx')  || '[]');
-    perfil       = JSON.parse(localStorage.getItem('cf_perfil')   || '{"nome":"","email":""}');
-    const preds  = JSON.parse(localStorage.getItem('cf_predictor')|| '[]');
-    window.predictorItems = preds.map(i=>({...i, lastDate:new Date(i.lastDate), nextDate:new Date(i.nextDate)}));
-  } catch(e){}
+    transactions = JSON.parse(localStorage.getItem('cf_tx')        || '[]');
+    metas        = JSON.parse(localStorage.getItem('cf_metas')     || '[]');
+    gatoTx       = JSON.parse(localStorage.getItem('cf_gato_tx')   || '[]');
+    perfil       = JSON.parse(localStorage.getItem('cf_perfil')    || '{"nome":"","email":""}');
+    const preds  = JSON.parse(localStorage.getItem('cf_predictor') || '[]');
+    window.predictorItems = preds.map(i=>({...i,lastDate:new Date(i.lastDate),nextDate:new Date(i.nextDate)}));
+  } catch(e){ console.warn('load error',e); }
 }
 
-/* ── INJETA IDs NOS ELEMENTOS ESTÁTICOS DO HTML ── */
+/* ── INJETA CONTAINERS NOS LUGARES CERTOS ── */
 function injectIds() {
-  // Últimas Transações (Home)
-  document.querySelectorAll('#screen-home .section').forEach(sec => {
-    if (sec.querySelector('.sec-title')?.textContent.includes('Últimas')) {
-      if (!document.getElementById('tx-list')) {
-        const list = document.createElement('div'); list.id = 'tx-list';
-        sec.appendChild(list);
-        sec.querySelector('.empty')?.setAttribute('id','tx-empty-state');
-      }
+  // HOME: Últimas Transações
+  if (!document.getElementById('tx-list')) {
+    const home = document.getElementById('screen-home');
+    if (home) {
+      home.querySelectorAll('.section').forEach(sec => {
+        if (sec.querySelector('.sec-title')?.textContent.trim().includes('ltimas')) {
+          const el = document.createElement('div');
+          el.id = 'tx-list';
+          el.style.cssText = 'padding:0 4px';
+          sec.appendChild(el);
+          const empty = sec.querySelector('.empty');
+          if (empty) empty.id = 'tx-empty-state';
+        }
+      });
     }
-  });
+  }
 
-  // Metas Ativas (Planejamento)
-  document.querySelectorAll('#screen-planejamento .section').forEach(sec => {
-    if (sec.querySelector('.sec-title')?.textContent.includes('Metas')) {
-      if (!document.getElementById('metas-list')) {
-        const list = document.createElement('div'); list.id = 'metas-list';
-        sec.appendChild(list);
-        const emptyEl = sec.querySelector('.empty');
-        if (emptyEl) emptyEl.id = 'metas-empty-state';
-        const pill = sec.querySelector('.pill.gray');
-        if (pill) pill.id = 'metas-count-pill';
-      }
+  // PLANEJAMENTO: Metas
+  if (!document.getElementById('metas-list')) {
+    const plan = document.getElementById('screen-planejamento');
+    if (plan) {
+      plan.querySelectorAll('.section').forEach(sec => {
+        if (sec.querySelector('.sec-title')?.textContent.trim().includes('Metas')) {
+          const el = document.createElement('div');
+          el.id = 'metas-list';
+          sec.appendChild(el);
+          const empty = sec.querySelector('.empty');
+          if (empty) empty.id = 'metas-empty-state';
+          const pill = sec.querySelector('.pill');
+          if (pill) pill.id = 'metas-count-pill';
+        }
+      });
     }
-  });
+  }
 
-  // Lançamentos de Gatos
-  document.querySelectorAll('#screen-gatos .section').forEach(sec => {
-    if (sec.querySelector('.sec-title')?.textContent.includes('Lançamentos')) {
-      if (!document.getElementById('gato-tx-list')) {
-        const list = document.createElement('div'); list.id = 'gato-tx-list';
-        sec.appendChild(list);
-        const emptyEl = sec.querySelector('.empty');
-        if (emptyEl) emptyEl.id = 'gato-empty-state';
-      }
+  // GATOS: Lançamentos
+  if (!document.getElementById('gato-tx-list')) {
+    const gatos = document.getElementById('screen-gatos');
+    if (gatos) {
+      gatos.querySelectorAll('.section').forEach(sec => {
+        if (sec.querySelector('.sec-title')?.textContent.trim().includes('ançamentos')) {
+          const el = document.createElement('div');
+          el.id = 'gato-tx-list';
+          sec.appendChild(el);
+          const empty = sec.querySelector('.empty');
+          if (empty) empty.id = 'gato-empty-state';
+        }
+      });
     }
-  });
+  }
 }
 
-/* ── OVERRIDE saveTx ── */
+/* ── OVERRIDE saveTx (botão Salvar de todos os modais) ── */
 window.saveTx = function(msg) {
   const map = {
     'despesa':      saveDespesa,
@@ -96,48 +109,60 @@ const _origOpen = window.openModal;
 window.openModal = function(type) {
   currentModal = type;
   _origOpen(type);
-  if (type==='edit-perfil') {
-    setTimeout(()=>{
+  if (type === 'edit-perfil') {
+    setTimeout(() => {
       const inputs = document.querySelectorAll('#modal-body .form-input');
-      if(inputs[0]&&perfil.nome)  inputs[0].value=perfil.nome;
-      if(inputs[1]&&perfil.email) inputs[1].value=perfil.email;
-    },60);
+      if (inputs[0] && perfil.nome)  inputs[0].value = perfil.nome;
+      if (inputs[1] && perfil.email) inputs[1].value = perfil.email;
+    }, 80);
   }
+};
+
+/* ── OVERRIDE navigate — atualiza ao trocar de tela ── */
+const _origNav = window.navigate;
+window.navigate = function(s) {
+  _origNav(s);
+  setTimeout(() => {
+    if (s==='home')         renderTxList();
+    if (s==='planejamento') renderMetas();
+    if (s==='gatos')        { renderGatoTx(); updateGatoCategorias(); }
+    if (s==='financas')     updateHistorico();
+  }, 100);
 };
 
 /* ── FUNÇÕES DE SALVAR ── */
 function saveDespesa() {
   const inputs = document.querySelectorAll('#modal-body .form-input');
-  const valor  = parseFloat(inputs[0]?.value)||0;
-  const desc   = inputs[1]?.value?.trim()||'';
-  const cat    = inputs[2]?.value||'Outros';
-  const pag    = inputs[3]?.value||'';
-  const data   = inputs[4]?.value||new Date().toISOString().split('T')[0];
-  if(!valor){showToast('Preencha o valor');return;}
+  const valor  = parseFloat(inputs[0]?.value) || 0;
+  const desc   = inputs[1]?.value?.trim() || '';
+  const cat    = inputs[2]?.value || 'Outros';
+  const pag    = inputs[3]?.value || '';
+  const data   = inputs[4]?.value || new Date().toISOString().split('T')[0];
+  if (!valor) { showToast('Preencha o valor'); return; }
   transactions.push({type:'Despesa',valor,desc,categoria:cat,pagamento:pag,data});
-  saveData(); updateBalances(); closeModal();
+  saveData(); updateAll(); closeModal();
   setTimeout(()=>showToast('Despesa salva!'),300);
 }
 
 function saveReceita() {
   const inputs = document.querySelectorAll('#modal-body .form-input');
-  const valor  = parseFloat(inputs[0]?.value)||0;
-  const desc   = inputs[1]?.value?.trim()||'';
-  const tipo   = inputs[2]?.value||'Outro';
-  const data   = inputs[3]?.value||new Date().toISOString().split('T')[0];
-  if(!valor){showToast('Preencha o valor');return;}
+  const valor  = parseFloat(inputs[0]?.value) || 0;
+  const desc   = inputs[1]?.value?.trim() || '';
+  const tipo   = inputs[2]?.value || 'Outro';
+  const data   = inputs[3]?.value || new Date().toISOString().split('T')[0];
+  if (!valor) { showToast('Preencha o valor'); return; }
   transactions.push({type:'Receita',valor,desc,categoria:tipo,data});
-  saveData(); updateBalances(); closeModal();
+  saveData(); updateAll(); closeModal();
   setTimeout(()=>showToast('Receita salva!'),300);
 }
 
 function saveMeta() {
   const inputs   = document.querySelectorAll('#modal-body .form-input');
-  const nome     = inputs[0]?.value?.trim()||'';
-  const objetivo = parseFloat(inputs[1]?.value)||0;
-  const contrib  = parseFloat(inputs[2]?.value)||0;
-  const prazo    = inputs[3]?.value||'';
-  if(!nome||!objetivo){showToast('Preencha nome e valor objetivo');return;}
+  const nome     = inputs[0]?.value?.trim() || '';
+  const objetivo = parseFloat(inputs[1]?.value) || 0;
+  const contrib  = parseFloat(inputs[2]?.value) || 0;
+  const prazo    = inputs[3]?.value || '';
+  if (!nome || !objetivo) { showToast('Preencha nome e valor objetivo'); return; }
   metas.push({nome,objetivo,contribuicao:contrib,prazo,atual:0});
   saveData(); renderMetas(); closeModal();
   setTimeout(()=>showToast('Meta criada!'),300);
@@ -145,47 +170,31 @@ function saveMeta() {
 
 function saveGatoDespesa() {
   const inputs = document.querySelectorAll('#modal-body .form-input');
-  const valor  = parseFloat(inputs[0]?.value)||0;
-  const desc   = inputs[1]?.value?.trim()||'';
-  const cat    = inputs[2]?.value||'Outro';
-  const gato   = inputs[3]?.value?.trim()||'';
-  const data   = inputs[4]?.value||new Date().toISOString().split('T')[0];
-  if(!valor){showToast('Preencha o valor');return;}
+  const valor  = parseFloat(inputs[0]?.value) || 0;
+  const desc   = inputs[1]?.value?.trim() || '';
+  const cat    = inputs[2]?.value || 'Outro';
+  const gato   = inputs[3]?.value?.trim() || '';
+  const data   = inputs[4]?.value || new Date().toISOString().split('T')[0];
+  if (!valor) { showToast('Preencha o valor'); return; }
   gatoTx.push({valor,desc,categoria:cat,gato,data});
   transactions.push({type:'Despesa',valor,desc:desc||cat,categoria:'Gatos 🐾',pagamento:'',data});
-  saveData(); updateBalances(); closeModal();
+  saveData(); updateAll(); closeModal();
   setTimeout(()=>showToast('Gasto registrado! 🐾'),300);
 }
 
 function savePerfil() {
   const inputs = document.querySelectorAll('#modal-body .form-input');
-  perfil.nome  = inputs[0]?.value?.trim()||perfil.nome;
-  perfil.email = inputs[1]?.value?.trim()||perfil.email;
+  const nome   = inputs[0]?.value?.trim();
+  const email  = inputs[1]?.value?.trim();
+  if (nome)  perfil.nome  = nome;
+  if (email) perfil.email = email;
   saveData(); updatePerfilUI(); closeModal();
   setTimeout(()=>showToast('Perfil atualizado!'),300);
 }
 
-/* ── SALDOS ── */
-function updateBalances() {
-  const receitas = transactions.filter(t=>t.type==='Receita').reduce((s,t)=>s+t.valor,0);
-  const despesas = transactions.filter(t=>t.type==='Despesa').reduce((s,t)=>s+t.valor,0);
-  const saldo    = receitas - despesas;
-
-  function setEl(id,v){
-    const el=document.getElementById(id);
-    if(!el)return;
-    el.dataset.real=FMT(v);
-    if(!window.hidden) el.textContent=FMT(v);
-  }
-  setEl('bal-main',saldo);
-  setEl('bal-rec', receitas);
-  setEl('bal-dep', despesas);
-
-  // Gatos total
-  const totalGatos = gatoTx.reduce((s,t)=>s+t.valor,0);
-  const elGatos = document.getElementById('cat-spent');
-  if(elGatos){elGatos.dataset.real=FMT(totalGatos); if(!window.hidden) elGatos.textContent=FMT(totalGatos);}
-
+/* ── ATUALIZA TUDO ── */
+function updateAll() {
+  updateBalances();
   renderTxList();
   renderMetas();
   renderGatoTx();
@@ -194,22 +203,44 @@ function updateBalances() {
   updatePieChart();
 }
 
+/* ── SALDOS ── */
+function updateBalances() {
+  const receitas = transactions.filter(t=>t.type==='Receita').reduce((s,t)=>s+t.valor,0);
+  const despesas = transactions.filter(t=>t.type==='Despesa').reduce((s,t)=>s+t.valor,0);
+  const saldo    = receitas - despesas;
+
+  function setEl(id, v) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.dataset.real = FMT(v);
+    if (!window.hidden) el.textContent = FMT(v);
+  }
+  setEl('bal-main', saldo);
+  setEl('bal-rec',  receitas);
+  setEl('bal-dep',  despesas);
+
+  // Total gatos
+  const totalGatos = gatoTx.reduce((s,t)=>s+t.valor,0);
+  const elG = document.getElementById('cat-spent');
+  if (elG) { elG.dataset.real=FMT(totalGatos); if(!window.hidden) elG.textContent=FMT(totalGatos); }
+}
+
 /* ── ÚLTIMAS TRANSAÇÕES (Home) ── */
 function renderTxList() {
   const list  = document.getElementById('tx-list');
   const empty = document.getElementById('tx-empty-state');
-  if(!list) return;
-  if(transactions.length===0){
-    list.innerHTML='';
-    if(empty) empty.style.display='';
+  if (!list) return;
+  if (transactions.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = '';
     return;
   }
-  if(empty) empty.style.display='none';
-  list.innerHTML=[...transactions].reverse().slice(0,10).map(t=>{
+  if (empty) empty.style.display = 'none';
+  list.innerHTML = [...transactions].reverse().slice(0,10).map(t => {
     const isRec = t.type==='Receita';
-    const cor   = isRec?'var(--yellow)':'var(--danger)';
-    const sinal = isRec?'+':'-';
-    const d     = t.data?new Date(t.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
+    const cor   = isRec ? 'var(--yellow)' : 'var(--danger)';
+    const sinal = isRec ? '+' : '-';
+    const d     = t.data ? new Date(t.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:14px;font-weight:600;color:var(--white)">${t.desc||t.categoria}</div>
@@ -225,16 +256,16 @@ function renderMetas() {
   const list  = document.getElementById('metas-list');
   const empty = document.getElementById('metas-empty-state');
   const pill  = document.getElementById('metas-count-pill');
-  if(!list) return;
-  if(pill) pill.textContent = metas.length+' meta'+(metas.length!==1?'s':'');
-  if(metas.length===0){
-    list.innerHTML='';
-    if(empty) empty.style.display='';
+  if (!list) return;
+  if (pill) pill.textContent = metas.length + ' meta' + (metas.length!==1?'s':'');
+  if (metas.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = '';
     return;
   }
-  if(empty) empty.style.display='none';
-  list.innerHTML=metas.map((m,idx)=>{
-    const pct=m.objetivo>0?Math.min(100,Math.round((m.atual/m.objetivo)*100)):0;
+  if (empty) empty.style.display = 'none';
+  list.innerHTML = metas.map((m,idx) => {
+    const pct = m.objetivo>0 ? Math.min(100,Math.round((m.atual/m.objetivo)*100)) : 0;
     return `<div style="background:var(--card);border-radius:var(--radius);padding:16px;border:1px solid var(--border);margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-size:15px;font-weight:700;color:var(--white)">${m.nome}</div>
@@ -244,7 +275,7 @@ function renderMetas() {
         <div style="height:100%;width:${pct}%;background:var(--yellow);border-radius:3px"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray)">
-        <span>${FMT(m.atual)} economizados</span><span>Meta: ${FMT(m.objetivo)}</span>
+        <span>${FMT(m.atual||0)} economizados</span><span>Meta: ${FMT(m.objetivo)}</span>
       </div>
       ${m.prazo?`<div style="font-size:11px;color:var(--gray);margin-top:4px">Prazo: ${m.prazo}</div>`:''}
       <div style="margin-top:10px;display:flex;gap:8px">
@@ -256,13 +287,13 @@ function renderMetas() {
 }
 
 window.abonarMeta = function(idx){
-  const val=parseFloat(prompt('Valor a abonar (R$):')||'0');
-  if(!val||val<=0)return;
-  metas[idx].atual=(metas[idx].atual||0)+val;
+  const val = parseFloat(prompt('Valor a abonar (R$):')||'0');
+  if(!val||val<=0) return;
+  metas[idx].atual = (metas[idx].atual||0)+val;
   saveData(); renderMetas();
 };
 window.deleteMeta = function(idx){
-  if(!confirm('Remover esta meta?'))return;
+  if(!confirm('Remover esta meta?')) return;
   metas.splice(idx,1); saveData(); renderMetas();
 };
 
@@ -270,15 +301,15 @@ window.deleteMeta = function(idx){
 function renderGatoTx() {
   const list  = document.getElementById('gato-tx-list');
   const empty = document.getElementById('gato-empty-state');
-  if(!list) return;
-  if(gatoTx.length===0){
-    list.innerHTML='';
-    if(empty) empty.style.display='';
+  if (!list) return;
+  if (gatoTx.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = '';
     return;
   }
-  if(empty) empty.style.display='none';
-  list.innerHTML=[...gatoTx].reverse().slice(0,20).map(t=>{
-    const d=t.data?new Date(t.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
+  if (empty) empty.style.display = 'none';
+  list.innerHTML = [...gatoTx].reverse().slice(0,20).map(t => {
+    const d = t.data ? new Date(t.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:14px;font-weight:600;color:var(--white)">${t.desc||t.categoria}${t.gato?' · '+t.gato:''}</div>
@@ -291,51 +322,54 @@ function renderGatoTx() {
 
 /* ── GATOS CATEGORIAS ── */
 function updateGatoCategorias() {
-  const cats = ['Ração','Veterinário','Petisco','Acessórios','Higiene','Medicamentos'];
-  cats.forEach(cat=>{
+  ['Ração','Veterinário','Petisco','Acessórios','Higiene','Medicamentos'].forEach(cat => {
     const total = gatoTx.filter(t=>t.categoria===cat).reduce((s,t)=>s+t.valor,0);
-    document.querySelectorAll('#screen-gatos .cat-name').forEach(el=>{
-      if(el.textContent===cat){
+    document.querySelectorAll('#screen-gatos .cat-name').forEach(el => {
+      if (el.textContent.trim()===cat) {
         const valEl = el.closest('.cat-item')?.querySelector('.cat-val');
-        if(valEl) valEl.textContent = total>0?FMT(total):'R$ —';
+        if (valEl) valEl.textContent = total>0 ? FMT(total) : 'R$ —';
       }
     });
   });
 }
 
-/* ── GRÁFICO PIZZA (atualizar com dados reais) ── */
+/* ── GRÁFICO PIZZA ── */
 function updatePieChart() {
-  if(!window.pieChart) return;
-  const catMap = {
-    'Alimentação':0,'Moradia':1,'Autocuidado':2,'Gatos 🐾':3,'Transporte':4
-  };
-  const data = [0,0,0,0,0,0]; // ordem: Alimentação,Moradia,Autocuidado,Gatos,Transporte,Outros
+  if (!window.pieChart) return;
+  const catMap = {'Alimentação':0,'Moradia':1,'Autocuidado':2,'Gatos 🐾':3,'Transporte':4};
+  const data = [0,0,0,0,0,0];
   transactions.filter(t=>t.type==='Despesa').forEach(t=>{
     const idx = catMap[t.categoria];
-    if(idx!==undefined) data[idx]+=t.valor;
-    else data[5]+=t.valor;
+    data[idx!==undefined?idx:5] += t.valor;
   });
   window.pieChart.data.datasets[0].data = data;
   window.pieChart.update();
 }
 
-/* ── HISTÓRICO (mês atual aparece por último) ── */
-const _origBuildHistorico = window.buildHistorico;
+/* ── HISTÓRICO (mês atual por último) ── */
 window.buildHistorico = function() {
   const list      = document.getElementById('hist-list');
   const yearBadge = document.getElementById('hist-year-badge');
-  if(!list) return;
+  if (!list) return;
   const now = new Date();
-  if(yearBadge) yearBadge.textContent = now.getFullYear();
-  list.innerHTML='';
-  const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  // Gera do mais antigo (11 meses atrás) até o atual (i=0 por último)
-  for(let i=11;i>=0;i--){
-    const d = new Date(now.getFullYear(),now.getMonth()-i,1);
+  if (yearBadge) yearBadge.textContent = now.getFullYear();
+  const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  list.innerHTML = '';
+  // i=11 → mais antigo, i=0 → mês atual (aparece por último)
+  for (let i=11; i>=0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
     const isCurrent = i===0;
+    const monthTx = transactions.filter(t=>{
+      if(!t.data) return false;
+      const td = new Date(t.data+'T12:00:00');
+      return td.getMonth()===d.getMonth() && td.getFullYear()===d.getFullYear();
+    });
+    const rec = monthTx.filter(t=>t.type==='Receita').reduce((s,t)=>s+t.valor,0);
+    const dep = monthTx.filter(t=>t.type==='Despesa').reduce((s,t)=>s+t.valor,0);
+    const bal = rec-dep;
     const card = document.createElement('div');
-    card.className='hist-card'+(isCurrent?' current':'');
-    card.innerHTML=`
+    card.className = 'hist-card'+(isCurrent?' current':'');
+    card.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
           <div class="hist-month">${MONTHS[d.getMonth()]}</div>
@@ -344,67 +378,49 @@ window.buildHistorico = function() {
         ${isCurrent?'<span class="pill yel">Mês atual</span>':''}
       </div>
       <div style="border-top:1px solid var(--border);margin:10px 0"></div>
-      <div class="hist-row"><span>Receitas</span><strong style="color:var(--yellow)">R$ —</strong></div>
-      <div class="hist-row" style="margin-top:4px"><span>Despesas</span><strong style="color:var(--danger)">R$ —</strong></div>
-      <div class="hist-balance ${isCurrent?'pos':''}">R$ —</div>`;
+      <div class="hist-row"><span>Receitas</span><strong style="color:var(--yellow)">${rec>0?FMT(rec):'R$ —'}</strong></div>
+      <div class="hist-row" style="margin-top:4px"><span>Despesas</span><strong style="color:var(--danger)">${dep>0?FMT(dep):'R$ —'}</strong></div>
+      <div class="hist-balance ${isCurrent?'pos':bal>=0?'pos':'neg'}">${(rec>0||dep>0)?FMT(bal):'R$ —'}</div>`;
     list.appendChild(card);
   }
-  // Scroll para o mês atual (último)
-  setTimeout(()=>{ list.lastElementChild?.scrollIntoView({block:'nearest'}); },200);
 };
 
 function updateHistorico() {
-  const cards = [...document.querySelectorAll('.hist-card')];
-  const now   = new Date();
-  // Cards foram gerados do mais antigo (index 0) ao atual (index 11)
-  cards.forEach((card,i)=>{
-    // i=0 é 11 meses atrás, i=11 é o atual
-    const monthsAgo = 11 - i;
-    const d = new Date(now.getFullYear(),now.getMonth()-monthsAgo,1);
-    const monthTx = transactions.filter(t=>{
-      if(!t.data) return false;
-      const td = new Date(t.data+'T12:00:00');
-      return td.getMonth()===d.getMonth()&&td.getFullYear()===d.getFullYear();
-    });
-    const rec = monthTx.filter(t=>t.type==='Receita').reduce((s,t)=>s+t.valor,0);
-    const dep = monthTx.filter(t=>t.type==='Despesa').reduce((s,t)=>s+t.valor,0);
-    const bal = rec-dep;
-    const rows = card.querySelectorAll('.hist-row strong');
-    if(rows[0]) rows[0].textContent=rec>0?FMT(rec):'R$ —';
-    if(rows[1]) rows[1].textContent=dep>0?FMT(dep):'R$ —';
-    const balEl = card.querySelector('.hist-balance');
-    if(balEl){
-      balEl.textContent=(rec>0||dep>0)?FMT(bal):'R$ —';
-      balEl.className='hist-balance '+(bal>=0?'pos':'neg');
-    }
-  });
+  window.buildHistorico();
 }
 
 /* ── PERFIL ── */
 function updatePerfilUI() {
-  if(perfil.nome){
-    document.querySelectorAll('[id*="perfil-nome"],.perfil-nome').forEach(el=>el.textContent=perfil.nome);
+  // Atualiza .profile-name e .profile-sub na tela de perfil
+  if (perfil.nome) {
+    const nameEl = document.querySelector('#screen-perfil .profile-name');
+    if (nameEl) nameEl.textContent = perfil.nome;
   }
-  if(perfil.email){
-    document.querySelectorAll('[id*="perfil-email"],.perfil-email').forEach(el=>el.textContent=perfil.email);
+  if (perfil.email) {
+    const subEl = document.querySelector('#screen-perfil .profile-sub');
+    if (subEl) subEl.textContent = perfil.email;
   }
 }
 
-/* ── PREDICTOR — salvar ao adicionar ── */
+/* ── PREDICTOR ── */
 const _origAdd = window.addPreditorItem;
-window.addPreditorItem = function(...a){_origAdd?.(...a); saveData();};
+window.addPreditorItem = function(...a){ _origAdd?.(...a); saveData(); };
 const _origUpd = window.updateItemInterval;
-window.updateItemInterval = function(...a){_origUpd?.(...a); saveData();};
+window.updateItemInterval = function(...a){ _origUpd?.(...a); saveData(); };
 
 /* ── INIT ── */
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', () => {
   loadData();
-  // Espera o splash terminar (~3.5s) para aplicar dados na UI
-  setTimeout(()=>{
-    injectIds();
-    buildHistorico(); // versão corrigida (mês atual por último)
+
+  // Injeta IDs imediatamente (elementos estão no DOM mas ocultos)
+  injectIds();
+
+  // Após splash terminar, atualiza toda a UI com dados salvos
+  setTimeout(() => {
     updateBalances();
-    if(window.renderPreditorItems) renderPreditorItems();
+    updateAll();
+    if (window.renderPreditorItems) renderPreditorItems();
     updatePerfilUI();
-  }, 3600);
+    buildHistorico();
+  }, 3700);
 });
