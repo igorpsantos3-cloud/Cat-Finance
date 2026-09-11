@@ -970,18 +970,13 @@ function startApp() {
   }, 650);
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  load();
-
-  // toque para pular ou avança automático em 2.5s
-  document.getElementById('splash').addEventListener('click', startApp);
-  setTimeout(startApp, 2500);
-
-  // set month label immediately
-  const me=new Date().getMonth(),yr=new Date().getFullYear();
-  const el=document.getElementById('month-label');
-  if(el) el.textContent=`${MONTHS[me]} ${yr}`;
-});
+// Roda direto — script está no fim do body, DOM já existe
+load();
+document.getElementById('splash').addEventListener('click', startApp);
+setTimeout(startApp, 2500);
+const _me=new Date().getMonth(),_yr=new Date().getFullYear();
+const _ml=document.getElementById('month-label');
+if(_ml) _ml.textContent=`${MONTHS[_me]} ${_yr}`;
 </script>
 </body>
 </html>
