@@ -491,8 +491,6 @@ function renderHome() {
   const monthKey = `${yr}-${String(me+1).padStart(2,'0')}`;
 
   // greeting
-  const h = now.getHours();
-  const saud = h<12?'Bom dia':'h<18?Boa tarde':'Boa noite';
   document.getElementById('home-greeting').textContent = (S.perfil.nome ? `Olá, ${S.perfil.nome.split(' ')[0]}! 👋` : 'Olá! 👋');
   document.getElementById('home-date').textContent = now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
 
