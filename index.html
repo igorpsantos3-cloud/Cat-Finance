@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cat Finance">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root{
   --bg:#0B0B0B;--surface:#141414;--card:#1C1C1C;--border:#2A2A2A;
@@ -251,6 +252,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--white);-webkit-fon
       </div>
       <div class="setting-item" onclick="navigate('predictor')">
         <span class="setting-label">Predictor 🔮</span>
+        <span class="setting-arrow">›</span>
+      </div>
+      <div class="setting-item" onclick="enviarResumoEmail()">
+        <span class="setting-label">✉️ Enviar resumo do mês por email</span>
         <span class="setting-arrow">›</span>
       </div>
       <div class="setting-item" onclick="if(confirm('Apagar todos os dados?')){localStorage.clear();location.reload()}">
@@ -641,7 +646,6 @@ function openAddSheet(){
     + '<button class="btn-save" style="background:var(--success);box-shadow:none" onclick="openModal(\'receita\')">💰  Receita / Entrada</button>'
     + '<button class="btn-save" style="background:var(--card);color:var(--white);border:1.5px solid var(--border);box-shadow:none" onclick="openModal(\'meta\')">🎯  Nova Meta</button>'
     + '<button class="btn-save" style="background:var(--card);color:var(--white);border:1.5px solid var(--border);box-shadow:none" onclick="openModal(\'predictor\')">🔮  Item Predictor</button>'
-    + '<button class="btn-save" style="background:rgba(255,200,0,.15);color:var(--yellow);border:1.5px solid var(--yellow);box-shadow:none;margin-top:4px" onclick="openModal(\'scan\')">📷  Escanear Nota Fiscal</button>'
     + '</div>';
   document.getElementById('modal').classList.add('open');
 }
@@ -683,6 +687,14 @@ function getForm(type){
     + '</div>' + catDatalist() + '</div>';
 
   if(type==='bill') return ''
+    + '<label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;border-radius:10px;border:1.5px dashed var(--yellow);color:var(--yellow);font-size:13px;font-weight:700;cursor:pointer;background:var(--ydim);margin-bottom:14px">'
+    + '📷 Preencher pela nota fiscal'
+    + '<input type="file" accept="image/*" capture="environment" style="display:none" onchange="processReceiptImage(this,\'bill\')">'
+    + '</label>'
+    + '<div id="ocr-progress-bill" style="display:none;margin-bottom:12px">'
+    + '<div style="font-size:12px;color:var(--gray);margin-bottom:6px" id="ocr-status-bill">Lendo nota...</div>'
+    + '<div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div id="ocr-bar-bill" style="height:100%;background:var(--yellow);width:0%;transition:width .3s;border-radius:3px"></div></div>'
+    + '</div>'
     + '<div class="form-group"><label class="form-label">Descrição</label>'
     + '<input class="form-input" id="f-desc" placeholder="Ex: Aluguel, Netflix..."></div>'
     + '<div class="form-row">'
@@ -903,40 +915,50 @@ function showToast(msg){
 /* ═══════════════════════════════════
    OCR — NOTA FISCAL
 ═══════════════════════════════════ */
-function processReceiptImage(input){
+function processReceiptImage(input, ctx){
   var file = input.files[0];
   if(!file) return;
+  ctx = ctx || 'scan';
 
-  // preview
-  var reader = new FileReader();
-  reader.onload = function(e){
-    var img = document.getElementById('ocr-preview');
-    img.src = e.target.result;
-    img.style.display = 'block';
-  };
-  reader.readAsDataURL(file);
+  var barId    = ctx==='bill' ? 'ocr-bar-bill'    : 'ocr-bar';
+  var statusId = ctx==='bill' ? 'ocr-status-bill' : 'ocr-status';
+  var progId   = ctx==='bill' ? 'ocr-progress-bill' : 'ocr-progress';
 
-  // show progress
-  document.getElementById('ocr-progress').style.display = 'block';
-  document.getElementById('ocr-result').style.display = 'none';
+  // preview (só no modal de scan)
+  if(ctx==='scan'){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = document.getElementById('ocr-preview');
+      img.src = e.target.result; img.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('ocr-result').style.display = 'none';
+  }
+
+  document.getElementById(progId).style.display = 'block';
 
   Tesseract.recognize(file, 'por', {
     logger: function(m){
       if(m.status === 'recognizing text'){
         var pct = Math.round(m.progress * 100);
-        document.getElementById('ocr-bar').style.width = pct + '%';
-        document.getElementById('ocr-status').textContent = 'Lendo a nota... ' + pct + '%';
+        var bar = document.getElementById(barId);
+        var st  = document.getElementById(statusId);
+        if(bar) bar.style.width = pct + '%';
+        if(st)  st.textContent  = 'Lendo a nota... ' + pct + '%';
       }
     }
   }).then(function(result){
-    document.getElementById('ocr-progress').style.display = 'none';
+    document.getElementById(progId).style.display = 'none';
     var text = result.data.text;
-    document.getElementById('ocr-raw').textContent = text;
-    parseReceiptText(text);
-    document.getElementById('ocr-result').style.display = 'block';
+    if(ctx==='scan'){
+      document.getElementById('ocr-raw').textContent = text;
+      parseReceiptText(text, 'scan');
+      document.getElementById('ocr-result').style.display = 'block';
+    } else {
+      parseReceiptText(text, 'bill');
+    }
   }).catch(function(err){
-    document.getElementById('ocr-progress').style.display = 'none';
-    document.getElementById('ocr-status').textContent = 'Erro ao ler a nota.';
+    document.getElementById(progId).style.display = 'none';
     showToast('Erro no OCR. Tente uma foto mais nítida.');
     console.error(err);
   });
@@ -1020,6 +1042,66 @@ function saveOcrBill(){
     pago:false,dataPagamento:null,recorrente:false,parcelado:false});
   save(); closeModal(); renderHome(); renderContas();
   showToast('Lançamento salvo! 🧾');
+}
+
+/* ═══════════════════════════════════
+   EMAILJS — RESUMO MENSAL
+═══════════════════════════════════ */
+var EJS_SERVICE  = 'service_1ldyenp';
+var EJS_TEMPLATE = 'template_kv7u0jm';
+var EJS_KEY      = 'GXya59-_dbrxrQ6FU';
+
+function enviarResumoEmail(){
+  if(!S.perfil.email){ showToast('Cadastre seu email no Perfil primeiro'); return; }
+
+  var now  = new Date();
+  var mk   = monthKey(now);
+  var mes  = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+
+  var billsMes = S.bills.filter(function(b){ return (b.vencimento||'').substring(0,7) === mk; });
+
+  var totalRec   = S.bills.filter(function(b){ return b.tipo==='receita'; }).reduce(function(s,b){ return s+b.valor; },0);
+  var totalPago  = S.bills.filter(function(b){ return b.tipo==='despesa' && b.pago; }).reduce(function(s,b){ return s+b.valor; },0);
+  var saldo      = (S.perfil.saldoInicial||0) + totalRec - totalPago;
+
+  var mesPago    = billsMes.filter(function(b){ return b.tipo==='despesa' && b.pago; }).reduce(function(s,b){ return s+b.valor; },0);
+  var mesApagar  = billsMes.filter(function(b){ return b.tipo==='despesa' && !b.pago; }).reduce(function(s,b){ return s+b.valor; },0);
+  var mesRec     = billsMes.filter(function(b){ return b.tipo==='receita'; }).reduce(function(s,b){ return s+b.valor; },0);
+
+  // gastos por categoria
+  var cats = {};
+  billsMes.filter(function(b){ return b.tipo==='despesa'; }).forEach(function(b){
+    var c = b.categoria||'Outros';
+    cats[c] = (cats[c]||0) + b.valor;
+  });
+  var catStr = Object.keys(cats).map(function(c){ return c + ': ' + FMT(cats[c]); }).join('\n') || 'Nenhum gasto registrado';
+
+  // lançamentos
+  var lancStr = billsMes.filter(function(b){ return b.tipo==='despesa'; })
+    .map(function(b){
+      var d = b.vencimento ? new Date(b.vencimento+'T12:00:00').toLocaleDateString('pt-BR') : '';
+      return (b.pago?'✅':'📋') + ' ' + (b.desc||b.categoria||'—') + ' — ' + FMT(b.valor) + (d?' ('+d+')':'');
+    }).join('\n') || 'Nenhum lançamento';
+
+  emailjs.init(EJS_KEY);
+  emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
+    email_destino: S.perfil.email,
+    nome:          S.perfil.nome || 'usuário',
+    mes:           mes,
+    receitas:      FMT(mesRec),
+    pago:          FMT(mesPago),
+    apagar:        FMT(mesApagar),
+    saldo:         FMT(saldo),
+    categorias:    catStr,
+    lancamentos:   lancStr
+  }).then(function(){
+    showToast('Resumo enviado para ' + S.perfil.email + ' ✉️');
+  }).catch(function(err){
+    showToast('Erro ao enviar email. Tente novamente.');
+    console.error(err);
+  });
+
+  showToast('Enviando resumo...');
 }
 
 /* ═══════════════════════════════════
